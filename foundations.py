@@ -1,4 +1,6 @@
-
+def pencil_draw(image, x, y,  edit_color, radius):
+    return image
+    
 def invert(image):
     return image
 

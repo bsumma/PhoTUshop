@@ -15,10 +15,19 @@ class DraggableCanvas(tk.Canvas):
     def __init__(self, *args, **kwargs):
         tk.Canvas.__init__(self, *args, **kwargs)
         self.bind("<ButtonPress-1>", self.start_drag)
+        self.bind("<ButtonPress-2>", self.replace_pixel)
         self.bind("<B1-Motion>", self.drag)
 
         self.start_x = 0
         self.start_y = 0
+
+    def replace_pixel(self, event):
+        global draw_on, image, edit_color, radius
+        if(draw_on):
+            drag_offset = self.coords("image_tag")
+            if image.size != (0,0):
+                image = pencil_draw(image, event.x+drag_offset[0], event.y+drag_offset[1], edit_color, radius)
+                update_display()
 
     def start_drag(self, event):
         self.start_x = event.x
@@ -30,6 +39,7 @@ class DraggableCanvas(tk.Canvas):
         self.move("all", dx, dy)
         self.start_x = event.x
         self.start_y = event.y
+        # print(self.coords("image_tag"))
 
 
 def donothing():
@@ -164,17 +174,45 @@ def display_histogram(hist, bins):
     tk.mainloop()
 
 
-def open_color_chooser():
-    global edit_color
+def open_color_radius_window():
+    color_radius_window = tk.Toplevel(root)
+    color_radius_window.title("Pencil")
 
-    if 'edit_color' not in globals():
-        edit_color = (0, 0, 0)
-    solid_button = tk.Button(root, text="Solid Button", command=donothing)
-    solid_button.config(bg=edit_color)
-    # Open color chooser dialog
-    edit_color = colorchooser.askcolor()[0]
-    # ignore g and b since we are only dealing in grayscale.
+    color_radius_window.geometry("150x250")  # Set the window size
 
+    canvas = tk.Canvas(color_radius_window, width=100, height=100, bg="white")
+    canvas.pack()
+
+    def change_color():
+        global edit_color
+        color = colorchooser.askcolor()
+        if color:
+            #Grayscale for now, only take Red component
+            average_color = (color[0][0] + color[0][1] + color[0][2])/3
+            grayscale_color = '#{:02x}{:02x}{:02x}'.format(int(average_color), int(average_color), int(average_color))
+            canvas.config(bg=grayscale_color)
+            edit_color = (int(average_color), int(average_color), int(average_color))
+
+    def update_radius(value):
+        global radius
+        radius = value
+        radius_label.config(text=f"Radius: {value}")
+
+    color_button = tk.Button(color_radius_window, text="Change Color", command=change_color)
+    color_button.pack()
+
+    radius_scale = tk.Scale(color_radius_window, from_=1, to=200, orient="horizontal", label="Radius", command=update_radius)
+    radius_scale.set(1)
+    radius_scale.pack()
+
+    radius_label = tk.Label(color_radius_window, text="Radius: 1")
+    radius_label.pack()
+
+def enable_draw():
+    global draw_on
+    draw_on = not draw_on
+    if(draw_on):
+        open_color_radius_window()
 
 def get_filter_size():
     # Create a new window
@@ -336,8 +374,11 @@ filemenu.add_separator()
 filemenu.add_command(label="Exit", command=root.quit)
 menubar.add_cascade(label="File", menu=filemenu)
 
+draw_on = False
+
 intmenu = tk.Menu(menubar, tearoff=0)
-intmenu.add_command(label="Draw Color", command=open_color_chooser)
+intmenu.add_checkbutton(label="Draw Color", onvalue=1, offvalue=0, variable=draw_on, command=enable_draw)
+
 intmenu.add_separator()
 intmenu.add_command(label="Invert Image", command=invert_image)
 intmenu.add_command(label="Gamma Correction", command=apply_gamma)
@@ -451,5 +492,7 @@ image = Image.new('L', (0, 0))
 original_image = Image.new('L', (0, 0))
 
 transfer_function = []
+edit_color = (0,0,0)
+radius = 1
 
 root.mainloop()
